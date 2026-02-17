@@ -43,16 +43,30 @@ def _s2_throttle():
     _LAST_S2_CALL = time.time()
 
 
-def _http_get(url: str, headers: dict | None = None) -> dict | None:
-    """GET JSON from URL. Returns None on any error. Logs errors in debug mode."""
+def _http_get(url: str, headers: dict | None = None, retries: int = 2) -> dict | None:
+    """GET JSON from URL. Retries on transient errors. Returns None on permanent failure."""
     req = urllib.request.Request(url, headers=headers or {})
     req.add_header("User-Agent", "biblio-checker/1.0 (mailto:jhdez32@gmail.com)")
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read())
-    except Exception as exc:
-        log.debug("HTTP GET %s → %s: %s", url[:80], type(exc).__name__, exc)
-        return None
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as exc:
+            if exc.code in (429, 500, 502, 503, 504) and attempt < retries:
+                wait = (attempt + 1) * 3
+                log.debug("HTTP %d on %s, retry in %ds", exc.code, url[:60], wait)
+                time.sleep(wait)
+                continue
+            log.debug("HTTP GET %s → HTTP %d", url[:80], exc.code)
+            return None
+        except Exception as exc:
+            if attempt < retries:
+                wait = (attempt + 1) * 2
+                log.debug("HTTP GET %s → %s, retry in %ds", url[:60], type(exc).__name__, wait)
+                time.sleep(wait)
+                continue
+            log.debug("HTTP GET %s → %s: %s", url[:80], type(exc).__name__, exc)
+            return None
 
 
 def _normalize(text: str) -> str:
@@ -360,7 +374,7 @@ def _escalate_to_llm(unresolved: list[dict], draft_path: str, output_dir: str,
         allowed_tools=["WebFetch", "Read", "Write"],
         model=model,
         max_turns=15,
-        permission_mode="acceptEdits",
+        permission_mode="default",
         env=env,
     )
 

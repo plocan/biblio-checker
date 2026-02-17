@@ -39,6 +39,10 @@ Genera `REFERENCES_VERIFIED.md` con una tabla por referencia:
 | `--output-dir` | No | Carpeta de salida (default: misma que el draft) |
 | `--json` | No | Salida JSON por consola |
 | `--debug` | No | Muestra errores HTTP detallados |
+| `--escalate` | No | Re-verifica refs NOT_FOUND/MISMATCH con un LLM (requiere `claude-code-sdk`) |
+| `--model` | No | Modelo para escalación LLM (default: `claude-haiku-4-5-20251001`) |
+
+> **Nota**: `--escalate` requiere tener instalado `claude-code-sdk` (`pip install claude-code-sdk`). Sin este flag, el programa funciona al 100% con bibliotecas estándar de Python.
 
 ## Formatos soportados
 
